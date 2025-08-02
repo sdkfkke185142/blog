@@ -1,0 +1,27 @@
+# 설정 파일 (API 키 포함)
+config.json
+
+# Python 바이트코드
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 배포 파일
+*.spec
+build/
+dist/
+
+# IDE 설정
+.vscode/
+.idea/
+
+# 로그 파일
+*.log
+
+# 환경 변수 파일
+.env
+.env.local
+
+# 시스템 파일
+.DS_Store
+Thumbs.db

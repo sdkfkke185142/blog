@@ -363,6 +363,16 @@ class TistoryOptimizerApp:
                                        command=self.export_results, state="disabled")
         self.export_button.pack(side=tk.LEFT, padx=(0, 10))
         
+        # 일괄다운로드 버튼
+        self.bulk_download_button = ttk.Button(control_frame, text="📝 일괄다운로드 (메모장)", 
+                                             command=self.bulk_download_to_notepad, state="disabled")
+        self.bulk_download_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        # HTML 다운로드 버튼
+        self.html_download_button = ttk.Button(control_frame, text="🌐 HTML 다운로드", 
+                                             command=self.bulk_download_to_html, state="disabled")
+        self.html_download_button.pack(side=tk.LEFT, padx=(0, 10))
+        
         # 전체 삭제 버튼
         ttk.Button(control_frame, text="🗑️ 전체 삭제", command=self.clear_all).pack(side=tk.RIGHT)
         
@@ -651,6 +661,8 @@ class TistoryOptimizerApp:
         self.generate_button.config(state="normal")
         self.stop_button.config(state="disabled")
         self.export_button.config(state="normal")
+        self.bulk_download_button.config(state="normal")
+        self.html_download_button.config(state="normal")
         
         # 통계 계산
         success_count = sum(1 for r in self.results if r['result']['success'])
@@ -673,6 +685,8 @@ class TistoryOptimizerApp:
         self.stop_button.config(state="disabled")
         if self.results:
             self.export_button.config(state="normal")
+            self.bulk_download_button.config(state="normal")
+            self.html_download_button.config(state="normal")
         
         self.progress_var.set("⏹️ 사용자에 의해 중지되었습니다.")
         self.current_progress_var.set("중지됨")
@@ -825,6 +839,350 @@ class TistoryOptimizerApp:
                 
                 f.write("=" * 80 + "\n\n")
     
+    def bulk_download_to_notepad(self):
+        """모든 글을 하나의 메모장 파일로 일괄 다운로드"""
+        if not self.results:
+            messagebox.showwarning("다운로드 오류", "다운로드할 결과가 없습니다.")
+            return
+        
+        # 성공한 결과만 필터링
+        successful_results = [item for item in self.results if item['result']['success']]
+        
+        if not successful_results:
+            messagebox.showwarning("다운로드 오류", "다운로드할 성공한 결과가 없습니다.")
+            return
+        
+        # 바탕화면 경로 가져오기
+        import os
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        
+        # 파일 이름 생성
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = os.path.join(desktop_path, f"티스토리_블로그_전체글_{timestamp}.txt")
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                # 헤더 작성
+                f.write("="*80 + "\n")
+                f.write("              티스토리 블로그 전체 글 모음\n")
+                f.write("="*80 + "\n\n")
+                f.write(f"생성 일시: {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')}\n")
+                f.write(f"총 글 개수: {len(successful_results)}개\n")
+                
+                total_chars = sum(item['result']['char_count'] for item in successful_results)
+                f.write(f"총 글자수: {total_chars:,}자\n\n")
+                
+                f.write("="*80 + "\n\n")
+                
+                # 각 글 작성
+                for i, item in enumerate(successful_results, 1):
+                    topic = item['topic']
+                    result = item['result']
+                    timestamp = item['timestamp']
+                    
+                    # 글 번호와 제목
+                    f.write(f"\n\n[{i:03d}] {topic}\n")
+                    f.write("-" * len(f"[{i:03d}] {topic}") + "\n")
+                    f.write(f"작성일: {timestamp}\n")
+                    f.write(f"글자수: {result['char_count']:,}자\n")
+                    f.write(f"AI 모델: {result.get('model', 'N/A')}\n\n")
+                    
+                    # 본문 내용
+                    content = result['content'].strip()
+                    f.write(content)
+                    f.write("\n\n")
+                    f.write("●" * 60)
+                    f.write("\n")
+                
+                # 푸터
+                f.write("\n\n" + "="*80 + "\n")
+                f.write("                        작성 완료\n")
+                f.write("="*80 + "\n")
+                f.write(f"\n파일 생성: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write("티스토리 최적화 프로그램으로 생성됨\n")
+                
+            # 성공 메시지
+            messagebox.showinfo(
+                "다운로드 완료", 
+                f"모든 글이 성공적으로 다운로드되었습니다!\n\n"
+                f"파일 위치: {filename}\n"
+                f"글 개수: {len(successful_results)}개\n"
+                f"총 글자수: {total_chars:,}자\n\n"
+                f"바탕화면에서 확인하세요!"
+            )
+            
+            # 파일 열기 여부 확인
+            if messagebox.askyesno("파일 열기", "생성된 파일을 지금 열어보시겠습니까?"):
+                try:
+                    import subprocess
+                    subprocess.run(['notepad.exe', filename], check=True)
+                except Exception as e:
+                    # notepad가 실행되지 않으면 기본 프로그램으로 열기
+                    try:
+                        os.startfile(filename)
+                    except Exception as e2:
+                        messagebox.showwarning("파일 열기 실패", f"파일을 열 수 없습니다: {e2}")
+                        
+        except Exception as e:
+            messagebox.showerror("다운로드 오류", f"파일 저장 중 오류가 발생했습니다:\n{e}")
+    
+    def bulk_download_to_html(self):
+        """모든 글을 HTML 형식으로 일괄 다운로드"""
+        if not self.results:
+            messagebox.showwarning("다운로드 오류", "다운로드할 결과가 없습니다.")
+            return
+        
+        # 성공한 결과만 필터링
+        successful_results = [item for item in self.results if item['result']['success']]
+        
+        if not successful_results:
+            messagebox.showwarning("다운로드 오류", "다운로드할 성공한 결과가 없습니다.")
+            return
+        
+        # 바탕화면 경로 가져오기
+        import os
+        desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
+        
+        # 파일 이름 생성
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = os.path.join(desktop_path, f"티스토리_블로그_전체글_{timestamp}.html")
+        
+        try:
+            with open(filename, 'w', encoding='utf-8') as f:
+                total_chars = sum(item['result']['char_count'] for item in successful_results)
+                
+                # HTML 문서 시작
+                f.write("""<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>티스토리 블로그 전체 글 모음</title>
+    <style>
+        body {
+            font-family: 'Malgun Gothic', '맑은 고딕', Arial, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #007bff;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #007bff;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        .header .stats {
+            color: #666;
+            font-size: 1.1em;
+        }
+        .post {
+            margin-bottom: 40px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+        .post-header {
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+        .post-title {
+            color: #007bff;
+            font-size: 1.8em;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .post-meta {
+            color: #666;
+            font-size: 0.9em;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        .post-content {
+            white-space: pre-line;
+            line-height: 1.8;
+            font-size: 1.1em;
+        }
+        .post-number {
+            background: #007bff;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 10px;
+        }
+        .toc {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        .toc h2 {
+            color: #007bff;
+            margin-top: 0;
+            margin-bottom: 15px;
+        }
+        .toc ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+        .toc li {
+            padding: 5px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .toc li:last-child {
+            border-bottom: none;
+        }
+        .toc a {
+            color: #007bff;
+            text-decoration: none;
+        }
+        .toc a:hover {
+            text-decoration: underline;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 50px;
+            padding-top: 20px;
+            border-top: 2px solid #e9ecef;
+            color: #666;
+        }
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            .container {
+                padding: 20px;
+            }
+            .post {
+                padding: 15px;
+            }
+            .post-title {
+                font-size: 1.5em;
+            }
+        }
+        @media print {
+            body {
+                background-color: white;
+            }
+            .container {
+                box-shadow: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📝 티스토리 블로그 전체 글 모음</h1>
+            <div class="stats">""")
+                
+                f.write(f"""
+                <strong>생성 일시:</strong> {datetime.now().strftime('%Y년 %m월 %d일 %H시 %M분')}<br>
+                <strong>총 글 개수:</strong> {len(successful_results):,}개<br>
+                <strong>총 글자수:</strong> {total_chars:,}자
+            </div>
+        </div>
+        
+        <!-- 목차 -->
+        <div class="toc">
+            <h2>📋 목차</h2>
+            <ul>""")
+                
+                # 목차 생성
+                for i, item in enumerate(successful_results, 1):
+                    topic = item['topic']
+                    f.write(f'                <li><a href="#post-{i}">[{i:03d}] {topic}</a></li>\n')
+                
+                f.write("""            </ul>
+        </div>
+        
+        <!-- 본문 -->""")
+                
+                # 각 글 작성
+                for i, item in enumerate(successful_results, 1):
+                    topic = item['topic']
+                    result = item['result']
+                    timestamp = item['timestamp']
+                    
+                    # HTML 특수문자 이스케이프
+                    def escape_html(text):
+                        import html
+                        return html.escape(text)
+                    
+                    escaped_topic = escape_html(topic)
+                    escaped_content = escape_html(result['content'].strip())
+                    
+                    f.write(f"""
+        <div class="post" id="post-{i}">
+            <div class="post-header">
+                <div class="post-number">{i:03d}</div>
+                <div class="post-title">{escaped_topic}</div>
+                <div class="post-meta">
+                    <span>📅 작성일: {timestamp}</span>
+                    <span>📊 글자수: {result['char_count']:,}자</span>
+                    <span>🤖 AI 모델: {result.get('model', 'N/A')}</span>
+                </div>
+            </div>
+            <div class="post-content">{escaped_content}</div>
+        </div>""")
+                
+                # HTML 문서 마무리
+                f.write(f"""
+        
+        <div class="footer">
+            <p><strong>파일 생성:</strong> {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}</p>
+            <p>🚀 티스토리 최적화 프로그램으로 생성됨</p>
+        </div>
+    </div>
+</body>
+</html>""")
+                
+            # 성공 메시지
+            messagebox.showinfo(
+                "HTML 다운로드 완료", 
+                f"모든 글이 HTML 형식으로 다운로드되었습니다!\n\n"
+                f"파일 위치: {filename}\n"
+                f"글 개수: {len(successful_results)}개\n"
+                f"총 글자수: {total_chars:,}자\n\n"
+                f"바탕화면에서 확인하세요!"
+            )
+            
+            # 파일 열기 여부 확인
+            if messagebox.askyesno("파일 열기", "생성된 HTML 파일을 브라우저에서 열어보시겠습니까?"):
+                try:
+                    import webbrowser
+                    webbrowser.open('file://' + filename.replace('\\', '/'))
+                except Exception as e:
+                    try:
+                        os.startfile(filename)
+                    except Exception as e2:
+                        messagebox.showwarning("파일 열기 실패", f"파일을 열 수 없습니다: {e2}")
+                        
+        except Exception as e:
+            messagebox.showerror("다운로드 오류", f"HTML 파일 저장 중 오류가 발생했습니다:\n{e}")
+    
     def clear_all(self):
         """전체 삭제"""
         if messagebox.askyesno("확인", "모든 결과를 삭제하시겠습니까?"):
@@ -844,6 +1202,8 @@ class TistoryOptimizerApp:
             self.progress_var.set("삭제되었습니다.")
             self.current_progress_var.set("대기 중...")
             self.export_button.config(state="disabled")
+            self.bulk_download_button.config(state="disabled")
+            self.html_download_button.config(state="disabled")
     
     def run(self):
         """애플리케이션 실행"""
