@@ -10,6 +10,8 @@ __pycache__/
 *.spec
 build/
 dist/
+# 새로운 exe 파일만 허용
+!dist/티스토리최적화프로그램2.exe
 
 # IDE 설정
 .vscode/
